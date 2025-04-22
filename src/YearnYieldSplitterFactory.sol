@@ -40,6 +40,10 @@ contract YearnYieldSplitterFactory {
         virtual
         returns (address)
     {
+        require(
+            deployments[_vault][_want] == address(0),
+            "Strategy already deployed"
+        );
         address _asset = IStrategyInterface(_vault).asset();
 
         string memory _name = string.concat(

@@ -33,14 +33,15 @@ contract YearnYieldSplitter is TokenizedStaker {
         vault = IStrategyInterface(_vault);
         want = _want;
         rewardHandler = _rewardHandler;
+
         _addReward(want, rewardHandler, 1 days);
 
         auction = Auction(
             AuctionFactory(0xCfA510188884F199fcC6e750764FAAbE6e56ec40)
                 .createNewAuction(
                     address(_want),
-                    address(rewardHandler),
-                    address(this),
+                    address(rewardHandler), // Reward Handler is the recipient
+                    address(this), // gov
                     1 days,
                     10_000
                 )
@@ -145,13 +146,17 @@ contract YearnYieldSplitter is TokenizedStaker {
         uint256 profit;
         if (currentAssets > _totalAssets) {
             profit = currentAssets - _totalAssets;
-            uint256 toWithdraw = profit;
-            if (toWithdraw > looseAssets) {
-                _freeFunds(toWithdraw - looseAssets);
+
+            if (profit > looseAssets) {
+                _freeFunds(profit - looseAssets);
             }
 
             // Adjust for any rounding losses on withdraw.
             profit = Math.min(profit, balanceOfAsset());
+
+            // If no profit return
+        } else {
+            return _totalAssets;
         }
 
         // Fees
