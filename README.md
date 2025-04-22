@@ -1,38 +1,6 @@
-# Tokenized Strategy Mix for Yearn V3 strategies
+# Yearn Yield Splitter
 
-This repo will allow you to write, test and deploy V3 "Tokenized Strategies" using [Foundry](https://book.getfoundry.sh/).
-
-You will only need to override the three functions in Strategy.sol of `_deployFunds`, `_freeFunds` and `_harvestAndReport`. With the option to also override `_tend`, `_tendTrigger`, `availableDepositLimit`, `availableWithdrawLimit` and `_emergencyWithdraw` if desired.
-
-For a more complete overview of how the Tokenized Strategies work please visit the [TokenizedStrategy Repo](https://github.com/yearn/tokenized-strategy).
-
-## How to start
-
-### Requirements
-
-- First you will need to install [Foundry](https://book.getfoundry.sh/getting-started/installation).
-NOTE: If you are on a windows machine it is recommended to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
-- Install [Node.js](https://nodejs.org/en/download/package-manager/)
-
-### Clone this repository
-
-```sh
-git clone --recursive https://github.com/yearn/tokenized-strategy-foundry-mix
-
-cd tokenized-strategy-foundry-mix
-
-yarn
-```
-
-### Set your environment Variables
-
-Use the `.env.example` template to create a `.env` file and store the environement variables. You will need to populate the `RPC_URL` for the desired network(s). RPC url can be obtained from various providers, including [Ankr](https://www.ankr.com/rpc/) (no sign-up required) and [Infura](https://infura.io/).
-
-Use .env file
-
-1. Make a copy of `.env.example`
-2. Add the value for `ETH_RPC_URL` and other example vars
-     NOTE: If you set up a global environment variable, that will take precedence.
+Earn your yield in your favorite shite coin or have your shite coins earn some real dough
 
 ### Build the project
 
@@ -45,12 +13,6 @@ Run tests
 ```sh
 make test
 ```
-
-## Strategy Writing
-
-For a complete guide to creating a Tokenized Strategy please visit: https://docs.yearn.fi/developers/v3/strategy_writing_guide
-
-NOTE: Compiler defaults to 8.23 but it can be adjusted in the foundry toml.
 
 ## Testing
 
