@@ -4,9 +4,14 @@ pragma solidity ^0.8.18;
 import {RewardHandler} from "./RewardHandler.sol";
 import {YearnYieldSplitter, ERC20} from "./YearnYieldSplitter.sol";
 import {IStrategyInterface} from "./interfaces/IStrategyInterface.sol";
+import {Auction} from "@periphery/Auctions/Auction.sol";
+import {AuctionFactory} from "@periphery/Auctions/AuctionFactory.sol";
 
 contract YearnYieldSplitterFactory {
     event NewStrategy(address indexed strategy, address indexed asset);
+
+    AuctionFactory public constant AUCTION_FACTORY =
+        AuctionFactory(0xCfA510188884F199fcC6e750764FAAbE6e56ec40);
 
     address public immutable emergencyAdmin;
 
@@ -64,13 +69,27 @@ contract YearnYieldSplitterFactory {
                     _name,
                     _vault,
                     _want,
-                    address(_rewardHandler),
-                    management
+                    address(_rewardHandler)
                 )
             )
         );
 
         _rewardHandler.initialize(address(_newStrategy));
+
+        Auction _auction = Auction(
+            AUCTION_FACTORY.createNewAuction(
+                address(_want),
+                address(_rewardHandler), // Reward Handler is the recipient
+                address(this), // gov
+                1 days,
+                10_000
+            )
+        );
+
+        _auction.enable(address(_asset));
+        _auction.transferGovernance(management);
+
+        _newStrategy.setAuction(address(_auction));
 
         _newStrategy.setPerformanceFeeRecipient(performanceFeeRecipient);
 

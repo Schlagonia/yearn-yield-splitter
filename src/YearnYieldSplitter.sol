@@ -8,7 +8,6 @@ import {RewardHandler} from "./RewardHandler.sol";
 import {IStrategyInterface} from "./interfaces/IStrategyInterface.sol";
 import {TokenizedStaker, ERC20} from "@periphery/Bases/Staker/TokenizedStaker.sol";
 import {Auction} from "@periphery/Auctions/Auction.sol";
-import {AuctionFactory} from "@periphery/Auctions/AuctionFactory.sol";
 
 contract YearnYieldSplitter is TokenizedStaker {
     using SafeERC20 for ERC20;
@@ -26,8 +25,7 @@ contract YearnYieldSplitter is TokenizedStaker {
         string memory _name,
         address _vault,
         address _want,
-        address _rewardHandler,
-        address _management
+        address _rewardHandler
     ) TokenizedStaker(_asset, _name) {
         asset.forceApprove(_vault, type(uint256).max);
         vault = IStrategyInterface(_vault);
@@ -35,20 +33,6 @@ contract YearnYieldSplitter is TokenizedStaker {
         rewardHandler = _rewardHandler;
 
         _addReward(want, rewardHandler, 1 days);
-
-        auction = Auction(
-            AuctionFactory(0xCfA510188884F199fcC6e750764FAAbE6e56ec40)
-                .createNewAuction(
-                    address(_want),
-                    address(rewardHandler), // Reward Handler is the recipient
-                    address(this), // gov
-                    1 days,
-                    10_000
-                )
-        );
-
-        auction.enable(address(asset));
-        auction.transferGovernance(_management);
     }
 
     /*//////////////////////////////////////////////////////////////
