@@ -4,8 +4,9 @@ pragma solidity ^0.8.18;
 import "forge-std/console2.sol";
 import {ExtendedTest} from "./ExtendedTest.sol";
 
-import {Strategy, ERC20} from "../../Strategy.sol";
-import {StrategyFactory} from "../../StrategyFactory.sol";
+import {YearnYieldSplitter, ERC20} from "../../YearnYieldSplitter.sol";
+import {RewardHandler} from "../../RewardHandler.sol";
+import {YearnYieldSplitterFactory} from "../../YearnYieldSplitterFactory.sol";
 import {IStrategyInterface} from "../../interfaces/IStrategyInterface.sol";
 
 // Inherit the events so they can be checked if desired.
@@ -22,9 +23,13 @@ interface IFactory {
 contract Setup is ExtendedTest, IEvents {
     // Contract instances that we will use repeatedly.
     ERC20 public asset;
+    ERC20 public vault;
+    ERC20 public want;
     IStrategyInterface public strategy;
 
-    StrategyFactory public strategyFactory;
+    RewardHandler public rewardHandler;
+
+    YearnYieldSplitterFactory public strategyFactory;
 
     mapping(string => address) public tokenAddrs;
 
@@ -43,8 +48,8 @@ contract Setup is ExtendedTest, IEvents {
     uint256 public MAX_BPS = 10_000;
 
     // Fuzz from $0.01 of 1e6 stable coins up to 1 trillion of a 1e18 coin
-    uint256 public maxFuzzAmount = 1e30;
-    uint256 public minFuzzAmount = 10_000;
+    uint256 public maxFuzzAmount = 100_000e6;
+    uint256 public minFuzzAmount = 1e6;
 
     // Default profit max unlock time is set for 10 days
     uint256 public profitMaxUnlockTime = 10 days;
@@ -52,13 +57,15 @@ contract Setup is ExtendedTest, IEvents {
     function setUp() public virtual {
         _setTokenAddrs();
 
-        // Set asset
-        asset = ERC20(tokenAddrs["DAI"]);
+        // Set tokens
+        asset = ERC20(tokenAddrs["USDC"]);
+        vault = ERC20(0xBe53A109B494E5c9f97b9Cd39Fe969BE68BF6204); // yvusdc
+        want = ERC20(tokenAddrs["YFI"]); // Example want token
 
         // Set decimals
         decimals = asset.decimals();
 
-        strategyFactory = new StrategyFactory(
+        strategyFactory = new YearnYieldSplitterFactory(
             management,
             performanceFeeRecipient,
             keeper,
@@ -68,12 +75,16 @@ contract Setup is ExtendedTest, IEvents {
         // Deploy strategy and set variables
         strategy = IStrategyInterface(setUpStrategy());
 
+        rewardHandler = RewardHandler(strategy.rewardHandler());
+
         factory = strategy.FACTORY();
 
         // label all the used addresses for traces
         vm.label(keeper, "keeper");
         vm.label(factory, "factory");
         vm.label(address(asset), "asset");
+        vm.label(address(vault), "vault");
+        vm.label(address(want), "want");
         vm.label(management, "management");
         vm.label(address(strategy), "strategy");
         vm.label(performanceFeeRecipient, "performanceFeeRecipient");
@@ -82,12 +93,7 @@ contract Setup is ExtendedTest, IEvents {
     function setUpStrategy() public returns (address) {
         // we save the strategy as a IStrategyInterface to give it the needed interface
         IStrategyInterface _strategy = IStrategyInterface(
-            address(
-                strategyFactory.newStrategy(
-                    address(asset),
-                    "Tokenized Strategy"
-                )
-            )
+            address(strategyFactory.newStrategy(address(vault), address(want)))
         );
 
         vm.prank(management);
@@ -136,7 +142,11 @@ contract Setup is ExtendedTest, IEvents {
         assertEq(_totalAssets, _totalDebt + _totalIdle, "!Added");
     }
 
-    function airdrop(ERC20 _asset, address _to, uint256 _amount) public {
+    function airdrop(
+        ERC20 _asset,
+        address _to,
+        uint256 _amount
+    ) public {
         uint256 balanceBefore = _asset.balanceOf(_to);
         deal(address(_asset), _to, balanceBefore + _amount);
     }

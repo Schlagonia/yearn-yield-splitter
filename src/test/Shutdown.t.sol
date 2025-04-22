@@ -15,9 +15,14 @@ contract ShutdownTest is Setup {
         mintAndDepositIntoStrategy(strategy, user, _amount);
 
         assertEq(strategy.totalAssets(), _amount, "!totalAssets");
+        assertGt(vault.balanceOf(address(strategy)), 0, "!vault balance");
 
         // Earn Interest
-        skip(1 days);
+        skip(2 days);
+
+        // Simulate vault rewards
+        uint256 wantRewards = ((_amount * 5) / 1000) * 1e12; // 0.5% rewards
+        airdrop(want, address(strategy.rewardHandler()), wantRewards);
 
         // Shutdown the strategy
         vm.prank(emergencyAdmin);
@@ -27,10 +32,11 @@ contract ShutdownTest is Setup {
 
         // Make sure we can still withdraw the full amount
         uint256 balanceBefore = asset.balanceOf(user);
+        uint256 wantBalanceBefore = want.balanceOf(user);
 
         // Withdraw all funds
         vm.prank(user);
-        strategy.redeem(_amount, user, user);
+        strategy.exit();
 
         assertGe(
             asset.balanceOf(user),
@@ -46,9 +52,14 @@ contract ShutdownTest is Setup {
         mintAndDepositIntoStrategy(strategy, user, _amount);
 
         assertEq(strategy.totalAssets(), _amount, "!totalAssets");
+        assertGt(vault.balanceOf(address(strategy)), 0, "!vault balance");
 
         // Earn Interest
-        skip(1 days);
+        skip(2 days);
+
+        // Simulate vault rewards
+        uint256 wantRewards = ((_amount * 5) / 1000) * 1e12; // 0.5% rewards
+        airdrop(want, address(strategy.rewardHandler()), wantRewards);
 
         // Shutdown the strategy
         vm.prank(emergencyAdmin);
@@ -65,8 +76,7 @@ contract ShutdownTest is Setup {
 
         // Withdraw all funds
         vm.prank(user);
-        strategy.redeem(_amount, user, user);
-
+        strategy.exit();
         assertGe(
             asset.balanceOf(user),
             balanceBefore + _amount,
@@ -74,5 +84,39 @@ contract ShutdownTest is Setup {
         );
     }
 
-    // TODO: Add tests for any emergency function added.
+    function test_shutdownRewardHandling() public {
+        uint256 _amount = 1000e6;
+
+        // Deposit into strategy
+        mintAndDepositIntoStrategy(strategy, user, _amount);
+
+        // Simulate vault rewards
+        uint256 wantRewards = 10e18;
+        airdrop(want, address(strategy.rewardHandler()), wantRewards);
+
+        // Check reward handler balance
+        assertEq(
+            want.balanceOf(address(strategy.rewardHandler())),
+            wantRewards
+        );
+
+        // Shutdown the strategy
+        vm.prank(emergencyAdmin);
+        strategy.shutdownStrategy();
+
+        // Check reward handler balance after shutdown
+        assertEq(
+            want.balanceOf(address(strategy.rewardHandler())),
+            wantRewards
+        );
+
+        // Claim rewards after shutdown
+        strategy.claimRewards();
+
+        // Check reward handler balance after claim
+        assertEq(want.balanceOf(address(strategy.rewardHandler())), 0);
+
+        // Check auction balance after claim
+        assertEq(want.balanceOf(strategy.auction()), 0);
+    }
 }

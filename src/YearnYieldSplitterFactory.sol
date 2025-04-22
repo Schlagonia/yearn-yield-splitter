@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.18;
 
-import {Strategy, ERC20} from "./Strategy.sol";
+import {RewardHandler} from "./RewardHandler.sol";
+import {YearnYieldSplitter, ERC20} from "./YearnYieldSplitter.sol";
 import {IStrategyInterface} from "./interfaces/IStrategyInterface.sol";
 
-contract StrategyFactory {
+contract YearnYieldSplitterFactory {
     event NewStrategy(address indexed strategy, address indexed asset);
 
     address public immutable emergencyAdmin;
@@ -14,7 +15,7 @@ contract StrategyFactory {
     address public keeper;
 
     /// @notice Track the deployments. asset => pool => strategy
-    mapping(address => address) public deployments;
+    mapping(address => mapping(address => address)) public deployments;
 
     constructor(
         address _management,
@@ -30,17 +31,42 @@ contract StrategyFactory {
 
     /**
      * @notice Deploy a new Strategy.
-     * @param _asset The underlying asset for the strategy to use.
+     * @param _vault The vault to use for the strategy.
+     * @param _want The want token for the strategy.
      * @return . The address of the new strategy.
      */
-    function newStrategy(
-        address _asset,
-        string calldata _name
-    ) external virtual returns (address) {
+    function newStrategy(address _vault, address _want)
+        external
+        virtual
+        returns (address)
+    {
+        address _asset = IStrategyInterface(_vault).asset();
+
+        string memory _name = string.concat(
+            "Yearn ",
+            ERC20(_vault).symbol(),
+            " to ",
+            ERC20(_want).symbol(),
+            " Yield Splitter"
+        );
+
+        RewardHandler _rewardHandler = new RewardHandler(_want);
+
         // tokenized strategies available setters.
         IStrategyInterface _newStrategy = IStrategyInterface(
-            address(new Strategy(_asset, _name))
+            address(
+                new YearnYieldSplitter(
+                    _asset,
+                    _name,
+                    _vault,
+                    _want,
+                    address(_rewardHandler),
+                    management
+                )
+            )
         );
+
+        _rewardHandler.initialize(address(_newStrategy));
 
         _newStrategy.setPerformanceFeeRecipient(performanceFeeRecipient);
 
@@ -52,7 +78,7 @@ contract StrategyFactory {
 
         emit NewStrategy(address(_newStrategy), _asset);
 
-        deployments[_asset] = address(_newStrategy);
+        deployments[_vault][_want] = address(_newStrategy);
         return address(_newStrategy);
     }
 
@@ -67,10 +93,13 @@ contract StrategyFactory {
         keeper = _keeper;
     }
 
-    function isDeployedStrategy(
-        address _strategy
-    ) external view returns (bool) {
-        address _asset = IStrategyInterface(_strategy).asset();
-        return deployments[_asset] == _strategy;
+    function isDeployedStrategy(address _strategy)
+        external
+        view
+        returns (bool)
+    {
+        address _want = IStrategyInterface(_strategy).want();
+        address _vault = IStrategyInterface(_strategy).vault();
+        return deployments[_vault][_want] == _strategy;
     }
 }

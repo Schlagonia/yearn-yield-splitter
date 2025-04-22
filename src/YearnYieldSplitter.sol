@@ -1,32 +1,54 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.18;
 
-import {BaseStrategy, ERC20} from "@tokenized-strategy/BaseStrategy.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {RewardHandler} from "./RewardHandler.sol";
 
-// Import interfaces for many popular DeFi projects, or add your own!
-//import "../interfaces/<protocol>/<Interface>.sol";
+import {IStrategyInterface} from "./interfaces/IStrategyInterface.sol";
+import {TokenizedStaker, ERC20} from "@periphery/Bases/Staker/TokenizedStaker.sol";
+import {Auction} from "@periphery/Auctions/Auction.sol";
+import {AuctionFactory} from "@periphery/Auctions/AuctionFactory.sol";
 
-/**
- * The `TokenizedStrategy` variable can be used to retrieve the strategies
- * specific storage data your contract.
- *
- *       i.e. uint256 totalAssets = TokenizedStrategy.totalAssets()
- *
- * This can not be used for write functions. Any TokenizedStrategy
- * variables that need to be updated post deployment will need to
- * come from an external call from the strategies specific `management`.
- */
-
-// NOTE: To implement permissioned functions you can use the onlyManagement, onlyEmergencyAuthorized and onlyKeepers modifiers
-
-contract Strategy is BaseStrategy {
+contract YearnYieldSplitter is TokenizedStaker {
     using SafeERC20 for ERC20;
+
+    IStrategyInterface public immutable vault;
+
+    address public immutable want;
+
+    address public immutable rewardHandler;
+
+    Auction public auction;
 
     constructor(
         address _asset,
-        string memory _name
-    ) BaseStrategy(_asset, _name) {}
+        string memory _name,
+        address _vault,
+        address _want,
+        address _rewardHandler,
+        address _management
+    ) TokenizedStaker(_asset, _name) {
+        asset.forceApprove(_vault, type(uint256).max);
+        vault = IStrategyInterface(_vault);
+        want = _want;
+        rewardHandler = _rewardHandler;
+        _addReward(want, rewardHandler, 1 days);
+
+        auction = Auction(
+            AuctionFactory(0xCfA510188884F199fcC6e750764FAAbE6e56ec40)
+                .createNewAuction(
+                    address(_want),
+                    address(rewardHandler),
+                    address(this),
+                    1 days,
+                    10_000
+                )
+        );
+
+        auction.enable(address(asset));
+        auction.transferGovernance(_management);
+    }
 
     /*//////////////////////////////////////////////////////////////
                 NEEDED TO BE OVERRIDDEN BY STRATEGIST
@@ -44,9 +66,7 @@ contract Strategy is BaseStrategy {
      * to deposit in the yield source.
      */
     function _deployFunds(uint256 _amount) internal override {
-        // TODO: implement deposit logic EX:
-        //
-        //      lendingPool.deposit(address(asset), _amount ,0);
+        vault.deposit(_amount, address(this));
     }
 
     /**
@@ -71,9 +91,11 @@ contract Strategy is BaseStrategy {
      * @param _amount, The amount of 'asset' to be freed.
      */
     function _freeFunds(uint256 _amount) internal override {
-        // TODO: implement withdraw logic EX:
-        //
-        //      lendingPool.withdraw(address(asset), _amount);
+        // Use previewWithdraw to round up.
+        uint256 shares = vault.previewWithdraw(_amount);
+        shares = Math.min(shares, balanceOfVault());
+
+        vault.redeem(shares, address(this), address(this));
     }
 
     /**
@@ -103,14 +125,62 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
-        // TODO: Implement harvesting logic and accurate accounting EX:
-        //
-        //      if(!TokenizedStrategy.isShutdown()) {
-        //          _claimAndSellRewards();
-        //      }
-        //      _totalAssets = aToken.balanceOf(address(this)) + asset.balanceOf(address(this));
-        //
-        _totalAssets = asset.balanceOf(address(this));
+        // Claim and notify pending rewards.
+        claimRewards();
+
+        _totalAssets = TokenizedStrategy.totalAssets();
+
+        // Settle if already taken but not done.
+        if (auction.isActive(address(asset))) {
+            if (auction.available(address(asset)) == 0) {
+                auction.settle(address(asset));
+            } else {
+                // If still active just return.
+                return _totalAssets;
+            }
+        }
+
+        uint256 looseAssets = balanceOfAsset();
+        uint256 currentAssets = looseAssets + valueOfVault();
+        uint256 profit;
+        if (currentAssets > _totalAssets) {
+            profit = currentAssets - _totalAssets;
+            uint256 toWithdraw = profit;
+            if (toWithdraw > looseAssets) {
+                _freeFunds(toWithdraw - looseAssets);
+            }
+
+            // Adjust for any rounding losses on withdraw.
+            profit = Math.min(profit, balanceOfAsset());
+        }
+
+        // Fees
+        uint256 fee = (profit * TokenizedStrategy.performanceFee()) / 10_000;
+        asset.safeTransfer(TokenizedStrategy.performanceFeeRecipient(), fee);
+
+        // Kick next auction
+        asset.safeTransfer(address(auction), profit - fee);
+        auction.kick(address(asset));
+    }
+
+    function claimRewards() public {
+        RewardHandler(rewardHandler).claimRewards();
+    }
+
+    function balanceOfVault() public view returns (uint256) {
+        return vault.balanceOf(address(this));
+    }
+
+    function balanceOfAsset() public view returns (uint256) {
+        return asset.balanceOf(address(this));
+    }
+
+    function valueOfVault() public view virtual returns (uint256) {
+        return vault.convertToAssets(balanceOfVault());
+    }
+
+    function vaultsMaxWithdraw() public view virtual returns (uint256) {
+        return vault.convertToAssets(vault.maxRedeem(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -138,16 +208,7 @@ contract Strategy is BaseStrategy {
     function availableWithdrawLimit(
         address /*_owner*/
     ) public view override returns (uint256) {
-        // NOTE: Withdraw limitations such as liquidity constraints should be accounted for HERE
-        //  rather than _freeFunds in order to not count them as losses on withdraws.
-
-        // TODO: If desired implement withdraw limit logic and any needed state variables.
-
-        // EX:
-        // if(yieldSource.notShutdown()) {
-        //    return asset.balanceOf(address(this)) + asset.balanceOf(yieldSource);
-        // }
-        return asset.balanceOf(address(this));
+        return balanceOfAsset() + vaultsMaxWithdraw();
     }
 
     /**
@@ -170,50 +231,15 @@ contract Strategy is BaseStrategy {
      *
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
-     *
-    function availableDepositLimit(
-        address _owner
-    ) public view override returns (uint256) {
-        TODO: If desired Implement deposit limit logic and any needed state variables .
-        
-        EX:    
-            uint256 totalAssets = TokenizedStrategy.totalAssets();
-            return totalAssets >= depositLimit ? 0 : depositLimit - totalAssets;
+     */
+    function availableDepositLimit(address _owner)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        return vault.maxDeposit(address(this));
     }
-    */
-
-    /**
-     * @dev Optional function for strategist to override that can
-     *  be called in between reports.
-     *
-     * If '_tend' is used tendTrigger() will also need to be overridden.
-     *
-     * This call can only be called by a permissioned role so may be
-     * through protected relays.
-     *
-     * This can be used to harvest and compound rewards, deposit idle funds,
-     * perform needed position maintenance or anything else that doesn't need
-     * a full report for.
-     *
-     *   EX: A strategy that can not deposit funds without getting
-     *       sandwiched can use the tend when a certain threshold
-     *       of idle to totalAssets has been reached.
-     *
-     * This will have no effect on PPS of the strategy till report() is called.
-     *
-     * @param _totalIdle The current amount of idle funds that are available to deploy.
-     *
-    function _tend(uint256 _totalIdle) internal override {}
-    */
-
-    /**
-     * @dev Optional trigger to override if tend() will be used by the strategy.
-     * This must be implemented if the strategy hopes to invoke _tend().
-     *
-     * @return . Should return true if tend() should be called by keeper or false if not.
-     *
-    function _tendTrigger() internal view override returns (bool) {}
-    */
 
     /**
      * @dev Optional function for a strategist to override that will
@@ -235,14 +261,16 @@ contract Strategy is BaseStrategy {
      *    }
      *
      * @param _amount The amount of asset to attempt to free.
-     *
+     */
     function _emergencyWithdraw(uint256 _amount) internal override {
-        TODO: If desired implement simple logic to free deployed funds.
-
-        EX:
-            _amount = min(_amount, aToken.balanceOf(address(this)));
-            _freeFunds(_amount);
+        _freeFunds(Math.min(_amount, vaultsMaxWithdraw()));
     }
 
-    */
+    function setAuction(address _auction) external onlyManagement {
+        require(Auction(_auction).want() == want, "Invalid want");
+        (, uint64 scaler, ) = Auction(_auction).auctions(address(asset));
+        require(scaler != 0, "asset not enabled");
+
+        auction = Auction(_auction);
+    }
 }
