@@ -257,6 +257,10 @@ contract YearnYieldSplitter is TokenizedStaker {
 
     function setAuction(address _auction) external onlyManagement {
         require(Auction(_auction).want() == want, "Invalid want");
+        require(
+            Auction(_auction).receiver() == rewardHandler,
+            "Invalid receiver"
+        );
         (, uint64 scaler, ) = Auction(_auction).auctions(address(asset));
         require(scaler != 0, "asset not enabled");
 

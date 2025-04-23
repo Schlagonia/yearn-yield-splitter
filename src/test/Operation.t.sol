@@ -130,6 +130,11 @@ contract OperationTest is Setup {
             abi.encodeWithSignature("auctions(address)"),
             abi.encode(0, 1e18, 0)
         );
+        vm.mockCall(
+            validAuction,
+            abi.encodeWithSignature("receiver()"),
+            abi.encode(address(strategy.rewardHandler()))
+        );
 
         vm.prank(management);
         strategy.setAuction(validAuction);
