@@ -8,7 +8,11 @@ import {Auction} from "@periphery/Auctions/Auction.sol";
 import {AuctionFactory} from "@periphery/Auctions/AuctionFactory.sol";
 
 contract YearnYieldSplitterFactory {
-    event NewStrategy(address indexed strategy, address indexed asset);
+    event NewYieldSplitter(
+        address indexed strategy,
+        address indexed vault,
+        address indexed want
+    );
 
     AuctionFactory public constant AUCTION_FACTORY =
         AuctionFactory(0xCfA510188884F199fcC6e750764FAAbE6e56ec40);
@@ -36,8 +40,8 @@ contract YearnYieldSplitterFactory {
 
     /**
      * @notice Deploy a new Strategy.
-     * @param _vault The vault to use for the strategy.
-     * @param _want The want token for the strategy.
+     * @param _vault The vault to use for the yield source.
+     * @param _want The token to turn the yield in to.
      * @return . The address of the new strategy.
      */
     function newStrategy(address _vault, address _want)
@@ -99,7 +103,7 @@ contract YearnYieldSplitterFactory {
 
         _newStrategy.setEmergencyAdmin(emergencyAdmin);
 
-        emit NewStrategy(address(_newStrategy), _asset);
+        emit NewYieldSplitter(address(_newStrategy), _vault, _want);
 
         deployments[_vault][_want] = address(_newStrategy);
         return address(_newStrategy);

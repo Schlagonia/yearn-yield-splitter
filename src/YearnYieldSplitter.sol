@@ -32,7 +32,7 @@ contract YearnYieldSplitter is TokenizedStaker {
         want = _want;
         rewardHandler = _rewardHandler;
 
-        _addReward(want, rewardHandler, 1 days);
+        _addReward(want, rewardHandler, 3 days);
     }
 
     /*//////////////////////////////////////////////////////////////

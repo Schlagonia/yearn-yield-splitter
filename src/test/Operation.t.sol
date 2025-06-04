@@ -97,6 +97,34 @@ contract OperationTest is Setup {
 
         // Check auction balance after claim
         assertEq(want.balanceOf(strategy.auction()), 0);
+        assertEq(want.balanceOf(address(strategy)), wantRewards);
+
+        skip(1 days);
+        assertGt(strategy.earned(user, address(want)), 0);
+
+        skip(3 days);
+        assertRelApproxEq(
+            strategy.earned(user, address(want)),
+            wantRewards,
+            0.0001e18
+        );
+
+        uint256 balanceBefore = asset.balanceOf(user);
+        uint256 wantBalanceBefore = want.balanceOf(user);
+
+        vm.prank(user);
+        strategy.exit();
+
+        assertRelApproxEq(
+            want.balanceOf(user),
+            wantBalanceBefore + wantRewards,
+            0.0001e18
+        );
+        assertEq(
+            asset.balanceOf(user),
+            balanceBefore + _amount,
+            "!final balance"
+        );
     }
 
     function test_auctionUpdate() public {
