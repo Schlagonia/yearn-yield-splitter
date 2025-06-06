@@ -93,7 +93,7 @@ contract Setup is ExtendedTest, IEvents {
     function setUpStrategy() public returns (address) {
         // we save the strategy as a IStrategyInterface to give it the needed interface
         IStrategyInterface _strategy = IStrategyInterface(
-            address(strategyFactory.newStrategy(address(vault), address(want)))
+            address(strategyFactory.newYieldSplitter(address(vault), address(want)))
         );
 
         vm.prank(management);

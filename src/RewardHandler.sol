@@ -25,6 +25,7 @@ contract RewardHandler {
 
     function initialize(address _strategy) external {
         require(strategy == address(0), "Already initialized");
+        require(IStrategyInterface(_strategy).want() == want, "bad want");
         strategy = _strategy;
     }
 }

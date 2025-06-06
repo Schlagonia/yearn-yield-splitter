@@ -44,7 +44,7 @@ contract YearnYieldSplitterFactory {
      * @param _want The token to turn the yield in to.
      * @return . The address of the new strategy.
      */
-    function newStrategy(address _vault, address _want)
+    function newYieldSplitter(address _vault, address _want)
         external
         virtual
         returns (address)
@@ -53,6 +53,8 @@ contract YearnYieldSplitterFactory {
             deployments[_vault][_want] == address(0),
             "Strategy already deployed"
         );
+        require(_vault != _want, "bad pair");
+
         address _asset = IStrategyInterface(_vault).asset();
 
         string memory _name = string.concat(

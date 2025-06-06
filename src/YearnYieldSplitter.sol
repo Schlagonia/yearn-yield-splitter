@@ -5,19 +5,23 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {RewardHandler} from "./RewardHandler.sol";
 
-import {IStrategyInterface} from "./interfaces/IStrategyInterface.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {TokenizedStaker, ERC20} from "@periphery/Bases/Staker/TokenizedStaker.sol";
 import {Auction} from "@periphery/Auctions/Auction.sol";
 
 contract YearnYieldSplitter is TokenizedStaker {
     using SafeERC20 for ERC20;
 
-    IStrategyInterface public immutable vault;
+    /// @notice The vault that the `asset` is deposited into.
+    IERC4626 public immutable vault;
 
+    /// @notice The token that the yield is converted into.
     address public immutable want;
 
+    /// @notice The reward handler that will claim rewards and notify the strategy.
     address public immutable rewardHandler;
 
+    /// @notice The auction that the `asset` is auctioned off in.
     Auction public auction;
 
     constructor(
@@ -28,7 +32,7 @@ contract YearnYieldSplitter is TokenizedStaker {
         address _rewardHandler
     ) TokenizedStaker(_asset, _name) {
         asset.forceApprove(_vault, type(uint256).max);
-        vault = IStrategyInterface(_vault);
+        vault = IERC4626(_vault);
         want = _want;
         rewardHandler = _rewardHandler;
 
@@ -221,7 +225,7 @@ contract YearnYieldSplitter is TokenizedStaker {
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(address _owner)
+    function availableDepositLimit(address)
         public
         view
         override
