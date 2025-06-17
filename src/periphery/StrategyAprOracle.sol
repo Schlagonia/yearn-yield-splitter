@@ -5,7 +5,6 @@ import {IStrategyInterface} from "../interfaces/IStrategyInterface.sol";
 import {AprOracle} from "@periphery/AprOracle/AprOracle.sol";
 
 contract StrategyAprOracle {
-
     AprOracle public constant CORE_APR_ORACLE =
         AprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
 

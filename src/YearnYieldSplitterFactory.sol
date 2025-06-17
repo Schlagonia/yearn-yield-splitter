@@ -17,6 +17,8 @@ contract YearnYieldSplitterFactory {
     AuctionFactory public constant AUCTION_FACTORY =
         AuctionFactory(0xCfA510188884F199fcC6e750764FAAbE6e56ec40);
 
+    RewardHandler public immutable rewardHandlerOriginal;
+
     address public immutable emergencyAdmin;
 
     address public management;
@@ -36,6 +38,8 @@ contract YearnYieldSplitterFactory {
         performanceFeeRecipient = _performanceFeeRecipient;
         keeper = _keeper;
         emergencyAdmin = _emergencyAdmin;
+
+        rewardHandlerOriginal = new RewardHandler();
     }
 
     /**
@@ -65,7 +69,9 @@ contract YearnYieldSplitterFactory {
             " Yield Splitter"
         );
 
-        RewardHandler _rewardHandler = new RewardHandler(_want);
+        RewardHandler _rewardHandler = RewardHandler(
+            rewardHandlerOriginal.clone()
+        );
 
         // tokenized strategies available setters.
         IStrategyInterface _newStrategy = IStrategyInterface(
