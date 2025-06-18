@@ -148,8 +148,15 @@ contract YearnYieldSplitter is TokenizedStaker {
         }
 
         // Fees
-        uint256 fee = (profit * TokenizedStrategy.performanceFee()) / 10_000;
-        asset.safeTransfer(TokenizedStrategy.performanceFeeRecipient(), fee);
+        uint256 performanceFee = TokenizedStrategy.performanceFee();
+        uint256 fee;
+        if (performanceFee > 0) {
+            fee = (profit * performanceFee) / MAX_BPS;
+            asset.safeTransfer(
+                TokenizedStrategy.performanceFeeRecipient(),
+                fee
+            );
+        }
 
         // Kick next auction
         asset.safeTransfer(address(auction), profit - fee);
