@@ -111,6 +111,7 @@ contract ShutdownTest is Setup {
         );
 
         // Claim rewards after shutdown
+        vm.prank(keeper);
         strategy.claimRewards();
 
         // Check reward handler balance after claim

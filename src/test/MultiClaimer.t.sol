@@ -64,6 +64,7 @@ contract MultiClaimerTest is Setup {
         airdrop(want, address(strategy.rewardHandler()), rewardAmount);
 
         // Claim rewards through the strategy first
+        vm.prank(keeper);
         strategy.claimRewards();
 
         // Skip time to unlock profits
@@ -114,7 +115,9 @@ contract MultiClaimerTest is Setup {
         );
 
         // Claim rewards through the strategies first
+        vm.prank(keeper);
         strategy.claimRewards();
+        vm.prank(keeper);
         strategy2.claimRewards();
 
         // Skip time to unlock profits
@@ -259,7 +262,9 @@ contract MultiClaimerTest is Setup {
         );
 
         // Claim rewards through strategies
+        vm.prank(keeper);
         strategy.claimRewards();
+        vm.prank(keeper);
         strategy2.claimRewards();
 
         // Skip time to unlock profits
@@ -287,6 +292,8 @@ contract MultiClaimerTest is Setup {
 
         // Deposit into strategy
         mintAndDepositIntoStrategy(strategy, user1, depositAmount);
+
+        skip(10);
 
         // Set MultiClaimer as claim recipient for user1
         vm.prank(user1);

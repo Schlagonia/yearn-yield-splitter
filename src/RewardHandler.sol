@@ -23,6 +23,7 @@ contract RewardHandler is Clonable {
     }
 
     function claimRewards() external {
+        require(msg.sender == strategy, "not strategy");
         uint256 balance = ERC20(want).balanceOf(address(this));
         if (balance == 0) return;
         ERC20(want).forceApprove(strategy, balance);

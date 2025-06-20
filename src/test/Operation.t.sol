@@ -90,6 +90,7 @@ contract OperationTest is Setup {
         assertEq(want.balanceOf(strategy.auction()), 0);
 
         // Claim rewards
+        vm.prank(keeper);
         strategy.claimRewards();
 
         // Check reward handler balance after claim
@@ -191,6 +192,8 @@ contract OperationTest is Setup {
         // Simulate rewards
         uint256 wantRewards = 10e18;
         airdrop(want, address(strategy.rewardHandler()), wantRewards);
+
+        vm.prank(keeper);
         strategy.claimRewards();
 
         vm.prank(keeper);

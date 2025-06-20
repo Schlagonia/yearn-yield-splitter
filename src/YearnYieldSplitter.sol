@@ -115,7 +115,7 @@ contract YearnYieldSplitter is TokenizedStaker {
         returns (uint256 _totalAssets)
     {
         // Claim and notify pending rewards.
-        claimRewards();
+        RewardHandler(rewardHandler).claimRewards();
 
         _totalAssets = TokenizedStrategy.totalAssets();
 
@@ -142,9 +142,9 @@ contract YearnYieldSplitter is TokenizedStaker {
             // Adjust for any rounding losses on withdraw.
             profit = Math.min(profit, balanceOfAsset());
 
-            // If no profit return
+            // If no profit return actual assets in case of loss
         } else {
-            return _totalAssets;
+            return currentAssets;
         }
 
         // Fees
@@ -163,7 +163,7 @@ contract YearnYieldSplitter is TokenizedStaker {
         auction.kick(address(asset));
     }
 
-    function claimRewards() public {
+    function claimRewards() external onlyKeepers {
         RewardHandler(rewardHandler).claimRewards();
     }
 
