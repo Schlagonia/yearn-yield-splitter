@@ -27,11 +27,10 @@ contract StrategyAprOracle {
      * @param _delta The difference in debt.
      * @return . The expected apr for the strategy represented as 1e18.
      */
-    function aprAfterDebtChange(address _strategy, int256 _delta)
-        external
-        view
-        returns (uint256)
-    {
+    function aprAfterDebtChange(
+        address _strategy,
+        int256 _delta
+    ) external view returns (uint256) {
         address vault = IStrategyInterface(_strategy).vault();
         return CORE_APR_ORACLE.getStrategyApr(vault, _delta);
     }

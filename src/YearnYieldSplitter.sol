@@ -232,12 +232,9 @@ contract YearnYieldSplitter is TokenizedStaker {
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(address)
-        public
-        view
-        override
-        returns (uint256)
-    {
+    function availableDepositLimit(
+        address
+    ) public view override returns (uint256) {
         return vault.maxDeposit(address(this));
     }
 
@@ -276,5 +273,19 @@ contract YearnYieldSplitter is TokenizedStaker {
         require(scaler != 0, "asset not enabled");
 
         auction = Auction(_auction);
+    }
+
+    function rescue(address _token) external onlyManagement {
+        require(
+            _token != want &&
+                _token != address(asset) &&
+                _token != address(vault) &&
+                _token != address(this),
+            "bad token"
+        );
+        ERC20(_token).safeTransfer(
+            msg.sender,
+            ERC20(_token).balanceOf(address(this))
+        );
     }
 }

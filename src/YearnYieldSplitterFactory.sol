@@ -6,6 +6,8 @@ import {YearnYieldSplitter, ERC20} from "./YearnYieldSplitter.sol";
 import {IStrategyInterface} from "./interfaces/IStrategyInterface.sol";
 import {Auction} from "@periphery/Auctions/Auction.sol";
 import {AuctionFactory} from "@periphery/Auctions/AuctionFactory.sol";
+import {AprOracle} from "@periphery/AprOracle/AprOracle.sol";
+import {StrategyAprOracle} from "./periphery/StrategyAprOracle.sol";
 
 contract YearnYieldSplitterFactory {
     event NewYieldSplitter(
@@ -14,10 +16,15 @@ contract YearnYieldSplitterFactory {
         address indexed want
     );
 
+    AprOracle public constant CORE_APR_ORACLE =
+        AprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
+
     AuctionFactory public constant AUCTION_FACTORY =
-        AuctionFactory(0xCfA510188884F199fcC6e750764FAAbE6e56ec40);
+        AuctionFactory(0xbC587a495420aBB71Bbd40A0e291B64e80117526);
 
     RewardHandler public immutable rewardHandlerOriginal;
+
+    StrategyAprOracle public immutable STRATEGY_APR_ORACLE;
 
     address public immutable emergencyAdmin;
 
@@ -40,6 +47,7 @@ contract YearnYieldSplitterFactory {
         emergencyAdmin = _emergencyAdmin;
 
         rewardHandlerOriginal = new RewardHandler();
+        STRATEGY_APR_ORACLE = new StrategyAprOracle();
     }
 
     /**
@@ -48,11 +56,10 @@ contract YearnYieldSplitterFactory {
      * @param _want The token to turn the yield in to.
      * @return . The address of the new strategy.
      */
-    function newYieldSplitter(address _vault, address _want)
-        external
-        virtual
-        returns (address)
-    {
+    function newYieldSplitter(
+        address _vault,
+        address _want
+    ) external virtual returns (address) {
         require(
             deployments[_vault][_want] == address(0),
             "Strategy already deployed"
@@ -93,9 +100,13 @@ contract YearnYieldSplitterFactory {
                 address(_want),
                 address(_rewardHandler), // Reward Handler is the recipient
                 address(this), // gov
-                1 days,
                 10_000
             )
+        );
+
+        CORE_APR_ORACLE.setOracle(
+            address(_newStrategy),
+            address(STRATEGY_APR_ORACLE)
         );
 
         _auction.enable(address(_asset));
@@ -128,11 +139,9 @@ contract YearnYieldSplitterFactory {
         keeper = _keeper;
     }
 
-    function isDeployedStrategy(address _strategy)
-        external
-        view
-        returns (bool)
-    {
+    function isDeployedStrategy(
+        address _strategy
+    ) external view returns (bool) {
         address _want = IStrategyInterface(_strategy).want();
         address _vault = IStrategyInterface(_strategy).vault();
         return deployments[_vault][_want] == _strategy;

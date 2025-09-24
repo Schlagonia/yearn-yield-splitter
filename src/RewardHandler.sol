@@ -39,4 +39,16 @@ contract RewardHandler is Clonable {
         want = _want;
         strategy = _strategy;
     }
+
+    function rescue(address _token) external {
+        require(
+            msg.sender == IStrategyInterface(strategy).management(),
+            "!management"
+        );
+        require(_token != want, "!want");
+        ERC20(_token).safeTransfer(
+            msg.sender,
+            ERC20(_token).balanceOf(address(this))
+        );
+    }
 }
